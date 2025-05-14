@@ -61,7 +61,7 @@ Prevented loading of DLL containing: dlp
 If no `.dll` files match the substring:
 ```
 Process started with PID: 1234
-No DLLs containing 'mal' were attempted to be loaded.
+No DLLs containing 'dlp' were attempted to be loaded.
 ```
 
 If the `.exe` fails to start:
