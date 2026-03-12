@@ -17,6 +17,7 @@ const (
 	PAGE_EXECUTE_READWRITE = 0x40
 	PROCESS_ALL_ACCESS     = 0x1F0FFF
 	CREATE_SUSPENDED       = 0x00000004
+	CREATE_NEW_CONSOLE     = 0x00000010
 )
 
 type ModuleInfo struct {
@@ -45,7 +46,7 @@ func printBanner() {
    _| |_| | | | (__ 
   |_____|_| |_|____|
   
-  Triad: DLL Unload
+  Triad: DLL Blocking
   Version: v1.0.0
 `
 	fmt.Println(banner)
@@ -73,10 +74,16 @@ func main() {
 		fmt.Printf("The file %s doesn't exist\n", *exePath)
 		return
 	}
-
+	const (
+		CREATE_SUSPENDED     = 0x00000004
+		STARTF_USESHOWWINDOW = 0x00000001
+		SW_SHOW              = 5
+	)
 	var si syscall.StartupInfo
 	var pi syscall.ProcessInformation
-
+	si.Cb = uint32(unsafe.Sizeof(si))
+	si.Flags = STARTF_USESHOWWINDOW
+	si.ShowWindow = SW_SHOW
 	cmdLine, _ := syscall.UTF16PtrFromString(*exePath)
 	err := syscall.CreateProcess(
 		nil,
@@ -84,7 +91,7 @@ func main() {
 		nil,
 		nil,
 		false,
-		CREATE_SUSPENDED,
+		CREATE_SUSPENDED|CREATE_NEW_CONSOLE,
 		nil,
 		nil,
 		&si,
@@ -99,10 +106,10 @@ func main() {
 	fmt.Println("________________________")
 	fmt.Println()
 	dllHex := stringToHex(*dllPattern)
-	sc, _ := hex.DecodeString(fmt.Sprintf("4883F80190909077414D89E94983C1284D8B094981F900F0FF0F722E49FFC149FFC1418039007422418039%s75EE49FFC149FFC1418039%s75E249FFC149FFC1418039%s75D64D31C9C3909090909090909090909090909090909090909090", dllHex[0], dllHex[1], dllHex[2]))
+	sc, _ := hex.DecodeString(fmt.Sprintf("4883F80190909077414D89E94983C1284D8B094981F900F0FF0F722E49FFC149FFC1418039007422418039%s75EE49FFC149FFC1418039%s75E249FFC149FFC1418039%s75D64D31C9C34D31C9909090909090909090909090909090909090", dllHex[0], dllHex[1], dllHex[2]))
 	readAllMemory(sc, pi.Process)
 	time.Sleep(3 * time.Second)
-
+	fmt.Scanln()
 	_, err = windows.ResumeThread(windows.Handle(pi.Thread))
 	if err != nil {
 		fmt.Printf("ResumeThread failed: %v", err)
@@ -133,7 +140,7 @@ func bytesEqual(a, b []byte) bool {
 	return true
 }
 
-func getNTMapViewOfSection() (uintptr, []byte, error) {
+func getNTMapViewOfSection(hProcess syscall.Handle) (uintptr, []byte, error) {
 	ntdll, err := syscall.LoadLibrary("ntdll.dll")
 	if err != nil {
 		return 0, nil, fmt.Errorf("LoadLibrary ntdll.dll failed: %v", err)
@@ -148,7 +155,7 @@ func getNTMapViewOfSection() (uintptr, []byte, error) {
 	var bytesRead uintptr
 	tmp := NtMapViewOfSectionAddr
 	for {
-		er := windows.ReadProcessMemory(windows.CurrentProcess(), tmp, &buffer[0],
+		er := windows.ReadProcessMemory(windows.Handle(hProcess), tmp, &buffer[0],
 			1,
 			&bytesRead)
 		if er != nil {
@@ -160,11 +167,13 @@ func getNTMapViewOfSection() (uintptr, []byte, error) {
 		}
 		tmp += 1
 	}
+	fmt.Scanln()
+	fmt.Printf("NtMapViewOfSection Code: %x\n", opCode)
 	return NtMapViewOfSectionAddr, opCode, nil
 }
 
 func readAllMemory(sc []byte, hProcess syscall.Handle) error {
-	NTMapViewOfSectionAddr, NTMapViewOfSectionCode, err := getNTMapViewOfSection()
+	NTMapViewOfSectionAddr, NTMapViewOfSectionCode, err := getNTMapViewOfSection(hProcess)
 	if err != nil {
 		return fmt.Errorf("GetProcAddress NTMapViewOfSection failed: %v", err)
 	}
